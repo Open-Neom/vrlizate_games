@@ -519,21 +519,21 @@ packages:
       path: "../vrlizate_apps"
       relative: true
     source: path
-    version: "0.1.0"
+    version: "1.0.0"
   vrlizate_assistant:
     dependency: "direct overridden"
     description:
       path: "../vrlizate_assistant"
       relative: true
     source: path
-    version: "0.1.0-beta.1"
+    version: "1.0.0"
   vrlizate_avatar:
     dependency: "direct overridden"
     description:
       path: "../vrlizate_avatar"
       relative: true
     source: path
-    version: "0.1.0"
+    version: "1.0.0"
   vrlizate_cast:
     dependency: "direct overridden"
     description:
@@ -561,14 +561,14 @@ packages:
       path: "../vrlizate_physics"
       relative: true
     source: path
-    version: "0.1.0"
+    version: "1.0.0"
   vrlizate_scene:
     dependency: "direct overridden"
     description:
       path: "../vrlizate_scene"
       relative: true
     source: path
-    version: "0.5.0"
+    version: "1.0.0"
   vrlizate_spatial_audio:
     dependency: "direct overridden"
     description:

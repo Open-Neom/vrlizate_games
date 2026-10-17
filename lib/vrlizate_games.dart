@@ -17,6 +17,14 @@ export 'package:vrlizate_apps/vrlizate_apps.dart'
         VrlzWebCatalogEntry,
         VrlzWebCatalogLoader;
 
-export 'src/vrlz_game_authoring.dart';
-export 'src/vrlz_game_package.dart';
-export 'src/vrlz_game_source_loader.dart';
+export 'domain/models/vr_arcade_cabinet_spec.dart';
+export 'domain/models/vr_game_save_entry.dart';
+export 'domain/models/vrlz_game_package.dart';
+export 'domain/services/vr_game_save_store.dart';
+export 'domain/services/vr_home_hold_exit_policy.dart';
+export 'domain/services/vrlz_game_authoring.dart';
+export 'domain/services/vrlz_game_source_loader.dart';
+export 'utils/constants/vr_games_constants.dart';
+export 'utils/enums/vr_arcade_cabinet_style.dart';
+export 'utils/enums/vrlz_game_kind.dart';
+export 'utils/enums/vrlz_game_origin.dart';
