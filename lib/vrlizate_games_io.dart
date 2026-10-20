@@ -12,4 +12,6 @@ export 'package:vrlizate_apps/vrlizate_apps_io.dart'
         VrlzDiscoveryLimits,
         VrlzPackageMetadata;
 
+export 'package:vrlizate_apps/vrlizate_apps_io.dart' show VrlzWebGameFileCache;
+
 export 'src/vrlz_game_directory_loader.dart';

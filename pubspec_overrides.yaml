@@ -1,4 +1,6 @@
 dependency_overrides:
+  wordsphere:
+    path: ../../../wordsphere_plugin
   vrlizate_apps:
     path: ../vrlizate_apps
   vrlizate_avatar:

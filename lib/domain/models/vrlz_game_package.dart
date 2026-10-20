@@ -7,10 +7,10 @@ import '../../utils/constants/vr_games_constants.dart';
 import '../../utils/enums/vrlz_game_kind.dart';
 import '../../utils/enums/vrlz_game_origin.dart';
 
-/// Validated `.vrlz` game build (`vrlizate.nes.v1` or `vrlizate.retro2d.v1`).
+/// Validated `.vrlz` NES, declarative 2D, or isolated browser game.
 ///
-/// Guarantees that the underlying `.vrlz` container is strictly a data-driven
-/// game build (containing zero executable Dart or native code) and exposes a
+/// Browser games execute verified JavaScript/WASM inside the browser sandbox;
+/// no package executes downloaded Dart or native code in the host. Exposes a
 /// unified contract regardless of whether it was loaded from Cloud, a Native
 /// Directory, or Internal Assets.
 final class VrlzGamePackage {
@@ -34,18 +34,26 @@ final class VrlzGamePackage {
 
   VrlzNesBundle? get nesBundle => package.nesBundle;
   VrlzRetroBundle? get retroBundle => package.retroBundle;
+  VrlzWebGameManifest? get webGameManifest => package.webGameManifest;
 
   String get runtime =>
-      nesBundle?.manifest.runtime ?? retroBundle!.manifest.runtime;
+      nesBundle?.manifest.runtime ??
+      retroBundle?.manifest.runtime ??
+      VrlzWebGameManifest.runtime;
 
   String get license =>
-      nesBundle?.manifest.license ?? retroBundle!.manifest.license;
+      nesBundle?.manifest.license ??
+      retroBundle?.manifest.license ??
+      webGameManifest!.license;
 
-  String? get sourceUrl => nesBundle?.manifest.sourceUrl;
+  String? get sourceUrl =>
+      nesBundle?.manifest.sourceUrl ?? webGameManifest?.sourceUrl.toString();
 
   /// SHA-256 of the inner game payload (`game.nes` or `level.json`).
   String get contentSha256 =>
-      nesBundle?.manifest.romSha256 ?? retroBundle!.manifest.levelSha256;
+      nesBundle?.manifest.romSha256 ??
+      retroBundle?.manifest.levelSha256 ??
+      crypto.sha256.convert(package.encode()).toString();
 
   /// Unique deduplication key across Asset, Local Directory, and Cloud sources.
   String get deduplicationKey =>
@@ -54,10 +62,11 @@ final class VrlzGamePackage {
   /// Re-encodes the validated game build as a deterministic STORE `.vrlz` archive.
   Uint8List encode() => package.encode();
 
-  /// Returns whether [package] is a game `.vrlz` (`nes` or `retro`).
+  /// Returns whether [package] has a supported game content profile.
   static bool isGamePackage(VrlzPackage package) =>
       package.kind == VrlzPackageKind.nes ||
-      package.kind == VrlzPackageKind.retro;
+      package.kind == VrlzPackageKind.retro ||
+      package.kind == VrlzPackageKind.webgame;
 
   /// Converts a [VrlzPackage] into a [VrlzGamePackage] or returns `null` if it
   /// is a non-game package (e.g. scene, builtin route, or connected world).
@@ -70,13 +79,15 @@ final class VrlzGamePackage {
     final gameKind = switch (package.kind) {
       VrlzPackageKind.nes => VrlzGameKind.nes,
       VrlzPackageKind.retro => VrlzGameKind.retro2d,
+      VrlzPackageKind.webgame => VrlzGameKind.webgame,
       _ => null,
     };
     if (gameKind == null) return null;
     final resolvedSha =
         packageSha256 ??
         (package.nesBundle?.manifest.romSha256 ??
-            package.retroBundle!.manifest.levelSha256);
+            package.retroBundle?.manifest.levelSha256 ??
+            crypto.sha256.convert(package.encode()).toString());
     return VrlzGamePackage._(
       kind: gameKind,
       origin: origin,

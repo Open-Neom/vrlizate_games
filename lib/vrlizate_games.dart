@@ -17,6 +17,15 @@ export 'package:vrlizate_apps/vrlizate_apps.dart'
         VrlzWebCatalogEntry,
         VrlzWebCatalogLoader;
 
+export 'package:vrlizate_apps/vrlizate_apps.dart'
+    show
+        VrlzWebGameManifest,
+        VrlzWebGameFile,
+        VrlzWebGameUnit,
+        VrlzWebGameLoader,
+        VrlzWebGameMemoryCache,
+        VrlzWebGameCache;
+
 export 'domain/models/vr_arcade_cabinet_spec.dart';
 export 'domain/models/vr_game_save_entry.dart';
 export 'domain/models/vrlz_game_package.dart';
