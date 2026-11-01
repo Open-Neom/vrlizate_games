@@ -6,5 +6,6 @@ export 'src/web/vr_web_game_controller.dart';
 export 'src/web/vr_web_game_origin_store.dart';
 export 'src/web/vr_web_game_server.dart';
 
+export 'src/web/vr_lan_stereo_web_stage.dart';
 export 'src/web/vr_web_game_capabilities.dart';
 export 'src/web/vr_web_game_document_policy.dart';
