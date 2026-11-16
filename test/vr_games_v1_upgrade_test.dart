@@ -64,6 +64,106 @@ void main() {
       expect(slot1, isNotNull);
       expect(slot1!.stateBytes, orderedEquals(<int>[1, 2, 3, 4, 5]));
     });
+
+    test(
+      'transactional restore preserves existing saves on corrupt base64, truncated JSON, invalid schemaVersion, or oversized state, and isolates stateBytes buffers (A05)',
+      () {
+        final store = VrGameSaveStore();
+        final callerBuffer = Uint8List.fromList(<int>[7, 8]);
+        store.saveEntry(
+          VrGameSaveEntry(
+            gameId: 'org.example.game',
+            highScore: 123,
+            stateBytes: callerBuffer,
+            updatedAtIso: '2026-11-06T12:00:00Z',
+          ),
+        );
+        // Mutating caller input buffer after save must not mutate stored bytes.
+        callerBuffer[0] = 55;
+        expect(
+          store.loadEntry('org.example.game')!.stateBytes,
+          orderedEquals(<int>[7, 8]),
+        );
+
+        // Mutating buffer returned by loadEntry or entriesForGame must not mutate store.
+        final loaded = store.loadEntry('org.example.game')!;
+        loaded.stateBytes[0] = 99;
+        store.entriesForGame('org.example.game').single.stateBytes[1] = 44;
+        expect(
+          store.loadEntry('org.example.game')!.stateBytes,
+          orderedEquals(<int>[7, 8]),
+        );
+
+        final snapshotBefore = store.toJson();
+
+        // 1. Corrupt base64 on second entry after valid first entry -> atomic rollback!
+        expect(
+          () => store.restoreFromJson(<String, Object?>{
+            'entries': <Object?>[
+              <String, Object?>{
+                'gameId': 'org.example.other',
+                'slotIndex': 0,
+                'highScore': 999,
+                'stateBytesBase64': 'AQID',
+              },
+              <String, Object?>{
+                'gameId': 'org.example.bad',
+                'stateBytesBase64': '%%%',
+              },
+            ],
+          }),
+          throwsFormatException,
+        );
+        expect(store.toJson(), equals(snapshotBefore));
+        expect(store.loadEntry('org.example.other'), isNull);
+
+        // 2. Interrupted / truncated JSON write -> atomic rollback!
+        expect(
+          () => store.restoreFromJsonString('{"entries":[{"gameId":"org.ex'),
+          throwsFormatException,
+        );
+        expect(store.toJson(), equals(snapshotBefore));
+
+        // 3. Unsupported future schemaVersion -> atomic rollback!
+        expect(
+          () => store.restoreFromJson(<String, Object?>{
+            'schemaVersion': 99,
+            'entries': const <Object?>[],
+          }),
+          throwsFormatException,
+        );
+        expect(store.toJson(), equals(snapshotBefore));
+
+        // 4. Oversized stateBytes (> maxSaveStateBytes) -> rejected!
+        final tooBig = Uint8List(VrGamesConstants.maxSaveStateBytes + 1);
+        expect(
+          () => store.saveEntry(
+            VrGameSaveEntry(gameId: 'org.example.huge', stateBytes: tooBig),
+          ),
+          throwsArgumentError,
+        );
+        expect(store.toJson(), equals(snapshotBefore));
+
+        // 5. Explicit schemaVersion: 1 succeeds cleanly.
+        store.restoreFromJson(<String, Object?>{
+          'schemaVersion': 1,
+          'entries': <Object?>[
+            <String, Object?>{
+              'gameId': 'org.example.migrated',
+              'slotIndex': 2,
+              'highScore': 777,
+              'stateBytesBase64': 'BAUG',
+              'updatedAtIso': '2026-11-06T13:00:00Z',
+            },
+          ],
+        });
+        expect(store.loadEntry('org.example.game'), isNull);
+        expect(
+          store.loadEntry('org.example.migrated', slotIndex: 2)!.stateBytes,
+          orderedEquals(<int>[4, 5, 6]),
+        );
+      },
+    );
   });
 
   group('VrHomeHoldExitPolicy', () {

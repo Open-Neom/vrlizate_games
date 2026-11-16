@@ -7,6 +7,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:vrlizate_games/vrlizate_games.dart';
+import 'package:vrlizate_games/src/web/vr_web_game_bridge.dart';
 import 'package:vrlizate_games/src/web/vr_web_game_origin_store.dart';
 import 'package:vrlizate_games/src/web/vr_web_game_server.dart';
 import 'package:vrlizate_games/src/web/vr_web_game_document_policy.dart';
@@ -31,6 +32,33 @@ void main() {
         first,
       );
       expect(await store.portFor('org.example.two'), isNot(first));
+    },
+  );
+
+  test(
+    'portForManifest isolates identical game IDs across different publisher origins while preserving updates from the same publisher (A07)',
+    () async {
+      final store = VrWebGameOriginStore(directory.path);
+      final publisherOneV1 = _manifest(
+        contentBaseUrl: 'https://games.example/releases/v1/',
+        revision: 'rev-1',
+      );
+      final publisherOneV2 = _manifest(
+        contentBaseUrl: 'https://games.example/releases/v2/',
+        revision: 'rev-2',
+      );
+      final publisherTwo = _manifest(
+        contentBaseUrl: 'https://different-publisher.example/build/',
+        revision: 'unrelated-rev',
+      );
+
+      expect(publisherOneV1.id, publisherTwo.id);
+      final portOneV1 = await store.portForManifest(publisherOneV1);
+      final portOneV2 = await store.portForManifest(publisherOneV2);
+      final portTwo = await store.portForManifest(publisherTwo);
+
+      expect(portOneV2, portOneV1);
+      expect(portTwo, isNot(portOneV1));
     },
   );
 
@@ -140,6 +168,87 @@ void main() {
     },
   );
 
+  test(
+    'blocks Service Worker / SharedWorker registrations and enforces host networkOrigins admission policy (A07)',
+    () async {
+      final manifest = _manifest(
+        networkOrigins: const <String>[
+          'https://admitted.example:8443',
+          'https://unapproved-third-party.example',
+        ],
+        extraFiles: const <String, String>{'sw.js': 'application/javascript'},
+      );
+      final loader = VrlzWebGameLoader(
+        manifest,
+        client: MockClient((_) async => http.Response('<p>real game</p>', 200)),
+      );
+      final restrictedServer = VrWebGameServer(
+        manifest,
+        loader,
+        allowedNetworkOrigins: <Uri>{
+          Uri.parse('https://admitted.example:8443'),
+        },
+        allowBlobWorkers: false,
+      );
+      await restrictedServer.start(port: 0);
+      addTearDown(() async {
+        await restrictedServer.close();
+        loader.close();
+      });
+
+      final entryResp = await http.get(restrictedServer.entryUri);
+      expect(entryResp.statusCode, 200);
+      final csp = entryResp.headers['content-security-policy']!;
+      expect(csp, contains("worker-src 'none'"));
+      expect(csp, isNot(contains("worker-src 'self'")));
+      expect(
+        csp,
+        contains('https://admitted.example:8443 wss://admitted.example:8443'),
+      );
+      expect(csp, isNot(contains('unapproved-third-party.example')));
+
+      // Service-Worker and Sec-Fetch-Dest: serviceworker/sharedworker requests fail closed with 403.
+      final swUri = restrictedServer.baseUri.resolve('sw.js');
+      expect((await http.get(swUri)).statusCode, 200);
+      expect(
+        (await http.get(
+          swUri,
+          headers: const <String, String>{'Service-Worker': 'script'},
+        )).statusCode,
+        403,
+      );
+      expect(
+        (await http.get(
+          swUri,
+          headers: const <String, String>{'Sec-Fetch-Dest': 'serviceworker'},
+        )).statusCode,
+        403,
+      );
+      expect(
+        (await http.get(
+          swUri,
+          headers: const <String, String>{'Sec-Fetch-Dest': 'sharedworker'},
+        )).statusCode,
+        403,
+      );
+
+      // Bridge script neutralizes navigator.serviceWorker and window.SharedWorker at document start.
+      final bridgeJs = vrWebGameBridgeScript(
+        manifest.controls,
+        manifest.controllerProfile,
+      );
+      expect(bridgeJs, contains('ServiceWorkerContainer'));
+      expect(
+        bridgeJs,
+        contains("Object.defineProperty(navigator, 'serviceWorker'"),
+      );
+      expect(
+        bridgeJs,
+        contains("Object.defineProperty(window, 'SharedWorker'"),
+      );
+    },
+  );
+
   test('corrupted download never reaches the game browser', () async {
     final loader = VrlzWebGameLoader(
       _manifest(),
@@ -207,6 +316,8 @@ void main() {
 }
 
 VrlzWebGameManifest _manifest({
+  String contentBaseUrl = 'https://games.example/build/',
+  String revision = 'abc123',
   List<String> networkOrigins = const [],
   Map<String, String> extraFiles = const {},
 }) {
@@ -218,9 +329,9 @@ VrlzWebGameManifest _manifest({
     'id': 'org.example.game',
     'title': 'Original game',
     'description': 'Browser integration',
-    'revision': 'abc123',
+    'revision': revision,
     'entrypoint': 'index.html',
-    'contentBaseUrl': 'https://games.example/build/',
+    'contentBaseUrl': contentBaseUrl,
     'networkOrigins': networkOrigins,
     'controllerProfile': 'dpad',
     'controls': {'A': 'Enter'},

@@ -35,6 +35,7 @@ abstract final class VrGamesConstants {
   static const String keyStateBytesBase64 = 'stateBytesBase64';
   static const String keyUpdatedAtIso = 'updatedAtIso';
   static const String keyEntries = 'entries';
+  static const String keySchemaVersion = 'schemaVersion';
 
   static const String styleClassicUprightId = 'classic_upright';
   static const String styleNeonCyberId = 'neon_cyber';
@@ -54,6 +55,12 @@ abstract final class VrGamesConstants {
 
   static const int defaultSaveSlotIndex = 0;
   static const int maxSaveSlotsPerGame = 8;
+  static const int saveSchemaVersion = 1;
+  static const int maxSaveStateBytes = 1048576;
+  static const int maxRestoredSaveEntries = 2048;
+  static const int maxSavePayloadJsonChars = 16777216;
+  static const int maxGameIdLength = 160;
+  static const int maxUpdatedAtIsoLength = 64;
   static const String defaultEpochIso = '1970-01-01T00:00:00.000Z';
 
   static const int minHoldDurationMs = 3000;

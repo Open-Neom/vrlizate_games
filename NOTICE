@@ -1,12 +1,11 @@
-VRlizate SDK — local preview
+VRlizate SDK — 1.0.0
 
 This source distribution assembles the Open Neom VRlizate modules listed in
 sdk.manifest.json. Each module retains its original LICENSE, source notices,
 declared version and repository references. The packaging tools and SDK
 documentation are provided under the Apache License, Version 2.0 (see LICENSE).
 
-Included modules: vrlizate, vrlizate_scene, vrlizate_widgets,
-vrlizate_joystick, vrlizate_home and vrlizate_apps.
+The 17 included SDK modules are enumerated in sdk.manifest.json.
 
 The minimum player includes Flutter-generated platform scaffolding. The Android
 Gradle wrapper is distributed by Gradle under the Apache License, Version 2.0:

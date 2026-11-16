@@ -6,6 +6,29 @@ String vrWebGameBridgeScript(Map<String, String> controls, String profile) =>
 (() => {
   'use strict';
   if (window.__vrlizateHost) return;
+  try {
+    if (typeof ServiceWorkerContainer !== 'undefined' && ServiceWorkerContainer.prototype) {
+      Object.defineProperty(ServiceWorkerContainer.prototype, 'register', {
+        value: () => Promise.reject(new DOMException('Service workers are blocked in VRlizate webgame sandbox.', 'SecurityError')),
+        writable: false,
+        configurable: false
+      });
+    }
+    Object.defineProperty(navigator, 'serviceWorker', {
+      value: undefined,
+      writable: false,
+      configurable: false
+    });
+    if (typeof SharedWorker !== 'undefined') {
+      Object.defineProperty(window, 'SharedWorker', {
+        value: function SharedWorker() {
+          throw new DOMException('Shared workers are blocked in VRlizate webgame sandbox.', 'SecurityError');
+        },
+        writable: false,
+        configurable: false
+      });
+    }
+  } catch (_) {}
   const bindings = Object.fromEntries(Object.entries(${jsonEncode(controls)}).map(([key,value])=>[key.toLowerCase(),value]));
   const profile = ${jsonEncode(profile)};
   const held = new Map();

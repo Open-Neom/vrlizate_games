@@ -21,6 +21,8 @@ class VrWebGameController extends ChangeNotifier {
     required this.loader,
     required this.port,
     this.captureFramesPerSecond = 15,
+    this.allowedNetworkOrigins,
+    this.allowBlobWorkers = true,
   }) {
     if (port < 20000 ||
         port > 60000 ||
@@ -32,6 +34,14 @@ class VrWebGameController extends ChangeNotifier {
   final VrlzWebGameManifest manifest;
   final VrlzWebGameLoader loader;
   final int port, captureFramesPerSecond;
+
+  /// Optional host allowlist intersecting [manifest.networkOrigins].
+  /// Pass `const <Uri>{}` when running untrusted third-party manifests without
+  /// external network authorization.
+  final Set<Uri>? allowedNetworkOrigins;
+
+  /// Whether in-memory `blob:` dedicated Web Workers are permitted in CSP.
+  final bool allowBlobWorkers;
   HeadlessInAppWebView? _browser;
   InAppWebViewController? _web;
   VrWebGameServer? _server;
@@ -71,7 +81,12 @@ class VrWebGameController extends ChangeNotifier {
   Future<void> _start() async {
     final generation = ++_generation;
     try {
-      final server = VrWebGameServer(manifest, loader);
+      final server = VrWebGameServer(
+        manifest,
+        loader,
+        allowedNetworkOrigins: allowedNetworkOrigins,
+        allowBlobWorkers: allowBlobWorkers,
+      );
       _server = server;
       await server.start(port: port);
       if (_disposed || generation != _generation) {
@@ -174,11 +189,30 @@ class VrWebGameController extends ChangeNotifier {
               : NavigationActionPolicy.CANCEL;
         },
         shouldInterceptRequest: (_, request) async {
+          final headers = request.headers ?? const <String, String>{};
+          String? headerIgnoreCase(String target) {
+            for (final entry in headers.entries) {
+              if (entry.key.toLowerCase() == target) return entry.value;
+            }
+            return null;
+          }
+
+          if (VrWebGameServer.isForbiddenWorkerRequest(
+            serviceWorkerHeader: headerIgnoreCase('service-worker'),
+            secFetchDestHeader: headerIgnoreCase('sec-fetch-dest'),
+          )) {
+            return WebResourceResponse(
+              statusCode: 403,
+              reasonPhrase: 'Blocked',
+              contentType: 'text/plain',
+              data: Uint8List(0),
+            );
+          }
           final uri = Uri.tryParse(request.url.toString());
           if (uri != null &&
               (server.owns(uri) ||
                   (uri.scheme == 'https' &&
-                      manifest.networkOrigins.any(
+                      server.effectiveNetworkOrigins.any(
                         (origin) => origin.origin == uri.origin,
                       )) ||
                   const {'data', 'blob'}.contains(uri.scheme))) {

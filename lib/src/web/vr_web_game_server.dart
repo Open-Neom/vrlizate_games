@@ -1,21 +1,63 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
-import 'dart:convert';
 
 import 'package:vrlizate_apps/vrlizate_apps.dart';
 
 /// Per-game loopback origin. Only declared, verified files can leave the loader.
 /// A fresh capability path rejects other localhost callers and stale sessions.
+///
+/// Service Worker / SharedWorker script registrations are denied at both HTTP
+/// (`Service-Worker` / `Sec-Fetch-Dest`) and CSP (`worker-src`) layers.
+/// External `connect-src` allowances from [manifest] can be intersected or
+/// disabled entirely by passing [allowedNetworkOrigins] (e.g. `const <Uri>{}`
+/// for untrusted third-party packages).
 final class VrWebGameServer {
-  VrWebGameServer(this.manifest, this.loader);
+  VrWebGameServer(
+    this.manifest,
+    this.loader, {
+    Set<Uri>? allowedNetworkOrigins,
+    this.allowBlobWorkers = true,
+  }) : effectiveNetworkOrigins = List<Uri>.unmodifiable(
+         _resolveNetworkOrigins(manifest.networkOrigins, allowedNetworkOrigins),
+       );
+
   final VrlzWebGameManifest manifest;
   final VrlzWebGameLoader loader;
+
+  /// Whether in-memory `blob:` dedicated Web Workers are permitted in CSP.
+  /// Same-origin HTTP workers (`'self'`) and Service Workers are always blocked.
+  final bool allowBlobWorkers;
+
+  /// Effective HTTPS origins admitted after applying host policy.
+  final List<Uri> effectiveNetworkOrigins;
+
   HttpServer? _server;
   StreamSubscription<HttpRequest>? _requests;
   late final String _token = base64Url
       .encode(List<int>.generate(24, (_) => Random.secure().nextInt(256)))
       .replaceAll('=', '');
+
+  static List<Uri> _resolveNetworkOrigins(
+    List<Uri> declared,
+    Set<Uri>? allowedByHost,
+  ) {
+    if (allowedByHost == null) {
+      return declared;
+    }
+    final admitted = <String>{
+      for (final uri in allowedByHost)
+        if (uri.scheme == 'https' &&
+            uri.host.isNotEmpty &&
+            uri.userInfo.isEmpty)
+          uri.origin,
+    };
+    return <Uri>[
+      for (final origin in declared)
+        if (admitted.contains(origin.origin)) origin,
+    ];
+  }
 
   Uri get baseUri {
     final server = _server;
@@ -34,6 +76,17 @@ final class VrWebGameServer {
       uri.userInfo.isEmpty &&
       uri.path.startsWith('/$_token/');
 
+  static bool isForbiddenWorkerRequest({
+    String? serviceWorkerHeader,
+    String? secFetchDestHeader,
+  }) {
+    if (serviceWorkerHeader != null && serviceWorkerHeader.trim().isNotEmpty) {
+      return true;
+    }
+    final dest = secFetchDestHeader?.trim().toLowerCase();
+    return dest == 'serviceworker' || dest == 'sharedworker';
+  }
+
   Future<void> start({required int port}) async {
     if (_server != null) throw StateError('Game origin already running.');
     _server = await HttpServer.bind(
@@ -50,7 +103,11 @@ final class VrWebGameServer {
       final host = request.headers.value(HttpHeaders.hostHeader);
       if (host != '127.0.0.1:${_server?.port}' ||
           !request.uri.path.startsWith('/$_token/') ||
-          !const {'GET', 'HEAD'}.contains(request.method)) {
+          !const {'GET', 'HEAD'}.contains(request.method) ||
+          isForbiddenWorkerRequest(
+            serviceWorkerHeader: request.headers.value('service-worker'),
+            secFetchDestHeader: request.headers.value('sec-fetch-dest'),
+          )) {
         response.statusCode = HttpStatus.forbidden;
         return;
       }
@@ -84,9 +141,11 @@ final class VrWebGameServer {
   }
 
   void _headers(HttpResponse response, String mediaType) {
-    final network = manifest.networkOrigins
+    final network = effectiveNetworkOrigins
         .map((uri) => '${uri.origin} wss://${uri.authority}')
         .join(' ');
+    final connectSrc = network.isEmpty ? "'self'" : "'self' $network";
+    final workerSrc = allowBlobWorkers ? 'blob:' : "'none'";
     response.headers
       ..set(HttpHeaders.contentTypeHeader, mediaType)
       ..set('X-Content-Type-Options', 'nosniff')
@@ -101,7 +160,7 @@ final class VrWebGameServer {
       )
       ..set(
         'Content-Security-Policy',
-        "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' 'wasm-unsafe-eval' blob:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; media-src 'self' blob: data:; worker-src 'self' blob:; connect-src 'self' $network; frame-src 'none'; object-src 'none'; base-uri 'self'; form-action 'none'; frame-ancestors 'none'",
+        "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' 'wasm-unsafe-eval' blob:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; media-src 'self' blob: data:; worker-src $workerSrc; connect-src $connectSrc; frame-src 'none'; object-src 'none'; base-uri 'self'; form-action 'none'; frame-ancestors 'none'",
       );
   }
 
