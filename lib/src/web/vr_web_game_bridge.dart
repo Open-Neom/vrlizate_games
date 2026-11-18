@@ -32,7 +32,7 @@ String vrWebGameBridgeScript(Map<String, String> controls, String profile) =>
   const bindings = Object.fromEntries(Object.entries(${jsonEncode(controls)}).map(([key,value])=>[key.toLowerCase(),value]));
   const profile = ${jsonEncode(profile)};
   const held = new Map();
-  const defaults = {a:'Enter',x:'KeyX',y:'Escape',l:'KeyL',r:'Space',grip:'Tab',start:'Escape',select:'Backspace'};
+  const defaults = {a:'Enter',x:'KeyX',y:'Escape',l:'KeyL',r:'Space',zl:'ShiftLeft',zr:'Space',grip:'Tab',start:'Escape',select:'Backspace'};
   const codes = {Enter:13,Escape:27,Space:32,Tab:9,ArrowLeft:37,ArrowUp:38,ArrowRight:39,ArrowDown:40,Backspace:8,Delete:46};
   let active = true, awaitingNeutral = true, lastInput = {}, lastAt = 0, bridgeInput=false, bridgePointer=false;
   let readyMessage=null;
@@ -159,7 +159,7 @@ String vrWebGameBridgeScript(Map<String, String> controls, String profile) =>
       if(x<-.35)wanted.add(bindings.left || 'ArrowLeft');if(x>.35)wanted.add(bindings.right || 'ArrowRight');
       if(y>.35)wanted.add(bindings.up || 'ArrowUp');if(y<-.35)wanted.add(bindings.down || 'ArrowDown');
     }
-    for(const name of ['a','x','y','l','r','grip','start','select']) {
+    for(const name of ['a','x','y','l','r','zl','zr','grip','start','select']) {
       if(buttons[name] && !handledButtons.has(name) && !(pointerProfile && (name==='a'||name==='x')))wanted.add(bindings[name] || defaults[name]);
     }
     if(!bridgeInput) {
@@ -169,8 +169,8 @@ String vrWebGameBridgeScript(Map<String, String> controls, String profile) =>
     if(!bridgeInput) {
       gamepad.axes=[x,-y,lookX,-lookY];gamepad.timestamp=now;
       // Standard layout. B remains reserved for the host's Back action;
-      // pointer triggers do not masquerade as a second game action.
-      for(const [i,name] of [[0,'a'],[2,'x'],[3,'y'],[4,'l'],[5,'r'],[8,'select'],[9,'start']]) {
+      // ZL/ZR map to standard L2/R2 triggers (6/7) for full WASM/Godot games.
+      for(const [i,name] of [[0,'a'],[2,'x'],[3,'y'],[4,'l'],[5,'r'],[6,'zl'],[7,'zr'],[8,'select'],[9,'start']]) {
         const down=!!buttons[name];gamepad.buttons[i]={pressed:down,touched:down,value:down?1:0};
       }
       for(const [i,down] of [[12,y>.35],[13,y<-.35],[14,x<-.35],[15,x>.35]])gamepad.buttons[i]={pressed:down,touched:down,value:down?1:0};

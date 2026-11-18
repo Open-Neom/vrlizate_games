@@ -20,7 +20,7 @@ class VrWebGameController extends ChangeNotifier {
     required this.manifest,
     required this.loader,
     required this.port,
-    this.captureFramesPerSecond = 15,
+    this.captureFramesPerSecond = 24,
     this.allowedNetworkOrigins,
     this.allowBlobWorkers = true,
   }) {
