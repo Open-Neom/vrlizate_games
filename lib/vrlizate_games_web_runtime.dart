@@ -8,5 +8,6 @@ export 'src/web/vr_web_game_server.dart';
 
 export 'src/web/vr_https_domain_web_stage.dart';
 export 'src/web/vr_lan_stereo_web_stage.dart';
+export 'src/web/vr_local_video_stereo_server.dart';
 export 'src/web/vr_web_game_capabilities.dart';
 export 'src/web/vr_web_game_document_policy.dart';
