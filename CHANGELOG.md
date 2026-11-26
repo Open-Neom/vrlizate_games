@@ -1,5 +1,6 @@
-## 1.0.0 - 2026-11-06
+## 1.0.0 - 2026-11-25
 
+- Support muted right-eye stereo mirror, scroll/video synchronization, and normalized click injection in `VrHttpsDomainWebStage`.
 - Make `VrGameSaveStore.restoreFromJson` / `restoreFromJsonString` 100 % transactional, enforce defensive byte copies and schema/payload budgets in `VrGameSaveEntry` (`A05`), isolate webgame `127.0.0.1:<port>` origins per publisher (`VrWebGameOriginStore.portForManifest`), block ServiceWorker/SharedWorker registrations across HTTP/CSP/DOM/Android layers, and add `allowedNetworkOrigins` host admission filtering (`A07`).
 - Promover `vrlizate_games` a la versión estable `1.0.0` bajo la estructura modular Open Neom (`lib/utils/constants/`, `lib/utils/enums/`, `lib/domain/models/`, `lib/domain/services/`) con una clase o enum por archivo y re-exportación compatible en `lib/src/`.
 - Añadir soporte `VrlzGameKind.webgame` (`vrlizate.webgame.v1`) y puente de controles VR para juegos web open-source (`Clumsy Bird`, `Hextris`, `2048`, `Pacman Canvas`).
